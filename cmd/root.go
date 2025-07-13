@@ -38,24 +38,26 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var cfgFile string
 var exitCode int
 
-// rootCmd represents the base command when called without any subcommands
+const DEFAULT_TASK_NAME = "b62a95c5-3b0e-4c3d-aceb-fdf20308e3c3"
+
 var rootCmd = &cobra.Command{
 	Version: "0.0.2",
-	Use:     "taskexec",
-	Short:   "A brief description of your application",
-	Long: `A longer description that spans multiple lines and likely contains
-examples and usage of using your application. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
+	Use:     "taskexec COMMAND [ARG]...",
+	Short:   "execute command using windows task scheduler",
+	Long: `
+If running on windows, invoke schtasks.exe to /CREATE a task for the command,
+/RUN the task, then /DELETE the task.
+This mechanism should allow GUI programs to be started from a client session
+on the windows OpenSSH daemon.
+On non-windows systems, the arguments are executed with the shell defined
+in the SHELL environment variable, defaulting to /bin/sh if SHELL is not set
+`,
 	Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		err := TaskExec(strings.Join(args, " "))
@@ -63,8 +65,6 @@ to quickly create a Cobra application.`,
 	},
 }
 
-// Execute adds all child commands to the root command and sets flags appropriately.
-// This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
 	err := rootCmd.Execute()
 	if err != nil {
@@ -72,20 +72,13 @@ func Execute() {
 	}
 	os.Exit(exitCode)
 }
-
 func init() {
 	cobra.OnInitialize(InitConfig)
 	OptionString("logfile", "l", "", "log filename")
 	OptionString("config", "c", "", "config file")
 	OptionSwitch("debug", "", "produce debug output")
 	OptionSwitch("verbose", "v", "increase verbosity")
-
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
-
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
+	OptionString("taskname", "t", "", "task name")
 }
 
 func TaskExec(command string) error {
@@ -109,6 +102,28 @@ func TaskExec(command string) error {
 	return err
 }
 
+func DeleteTask(name string) error {
+	return exec.Command("schtasks.exe", "/delete", "/tn", name, "/f").Run()
+}
+
 func WinTaskExec(command string) error {
-	return fmt.Errorf("unimplmented")
+	name := viper.GetString("taskname")
+	if name == "" {
+		name = DEFAULT_TASK_NAME
+	}
+
+	err := DeleteTask(name)
+	cobra.CheckErr(err)
+
+	cmd := exec.Command("schtasks.exe", "/create", "/tn", name, "/sc", "onstart", "/it", "/tr", command)
+	err = cmd.Run()
+	cobra.CheckErr(err)
+
+	defer DeleteTask(name)
+
+	cmd = exec.Command("schtasks.exe", "/run", "/tn", name)
+	err = cmd.Run()
+	cobra.CheckErr(err)
+
+	return nil
 }
