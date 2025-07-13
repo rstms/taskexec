@@ -112,11 +112,10 @@ func WinTaskExec(command string) error {
 		name = DEFAULT_TASK_NAME
 	}
 
-	err := DeleteTask(name)
-	cobra.CheckErr(err)
+	DeleteTask(name)
 
 	cmd := exec.Command("schtasks.exe", "/create", "/tn", name, "/sc", "onstart", "/it", "/tr", command)
-	err = cmd.Run()
+	err := cmd.Run()
 	cobra.CheckErr(err)
 
 	defer DeleteTask(name)
