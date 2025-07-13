@@ -31,12 +31,17 @@ POSSIBILITY OF SUCH DAMAGE.
 package cmd
 
 import (
+	"fmt"
 	"os"
+	"os/exec"
+	"runtime"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
 
 var cfgFile string
+var exitCode int
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -51,7 +56,11 @@ This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
-	// Run: func(cmd *cobra.Command, args []string) { },
+	Args: cobra.MinimumNArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		err := TaskExec(strings.Join(args, " "))
+		cobra.CheckErr(err)
+	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -61,6 +70,7 @@ func Execute() {
 	if err != nil {
 		os.Exit(1)
 	}
+	os.Exit(exitCode)
 }
 
 func init() {
@@ -76,4 +86,29 @@ func init() {
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
+}
+
+func TaskExec(command string) error {
+	if runtime.GOOS == "windows" {
+		return WinTaskExec(command)
+	}
+	shell := os.Getenv("SHELL")
+	if shell == "" {
+		shell = "/bin/sh"
+	}
+	fmt.Printf("command: %s\n", command)
+	cmd := exec.Command(shell, "-c", command)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err := cmd.Run()
+	switch err.(type) {
+	case *exec.ExitError:
+		exitCode = cmd.ProcessState.ExitCode()
+		err = nil
+	}
+	return err
+}
+
+func WinTaskExec(command string) error {
+	return fmt.Errorf("unimplmented")
 }
