@@ -1,0 +1,6 @@
+taskexec
+notes
+cruft
+*.core
+*.log
+*postactivate
