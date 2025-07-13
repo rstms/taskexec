@@ -47,7 +47,7 @@ var exitCode int
 const DEFAULT_TASK_NAME = "b62a95c5-3b0e-4c3d-aceb-fdf20308e3c3"
 
 var rootCmd = &cobra.Command{
-	Version: "0.0.2",
+	Version: "0.0.3",
 	Use:     "taskexec COMMAND [ARG]...",
 	Short:   "execute command using windows task scheduler",
 	Long: `
